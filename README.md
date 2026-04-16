@@ -12,6 +12,8 @@ A modern PyQt6 desktop GUI for the Hugging Face model `nvidia/magpie_tts_multili
 - last-output playback inside the app
 - virtual-environment friendly Windows setup scripts
 
+  <img width="1143" height="983" alt="magpie_tts_studio" src="https://github.com/user-attachments/assets/c553af37-64cd-4e16-8925-65cb9d27bc57" />
+
 ## Project structure
 
 - `app.py` — GUI entry point
