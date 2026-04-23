@@ -14,7 +14,13 @@ A modern PyQt6 desktop GUI for the Hugging Face model `nvidia/magpie_tts_multili
 
   <img width="1143" height="983" alt="magpie_tts_studio" src="https://github.com/user-attachments/assets/c553af37-64cd-4e16-8925-65cb9d27bc57" />
 
+Direct english output (example):
+
   https://github.com/user-attachments/assets/ed5dcb96-3f7a-476e-b8b6-ccc55e748d26
+
+  German Voice Output (example random generated sci-fi story):
+
+https://github.com/user-attachments/assets/aa309b10-f6c8-4867-bd62-ee82161e4a4f
 
 ## Project structure
 
