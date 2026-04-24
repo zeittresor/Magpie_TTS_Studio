@@ -17,9 +17,13 @@ A modern PyQt6 desktop GUI for the Hugging Face model `nvidia/magpie_tts_multili
 - virtual-environment friendly Windows setup scripts
 - future-friendly `cuda-bindings` install to avoid NeMo/pip resolver warnings on Windows without hard-pinning CUDA below 13
 
-  <img width="1143" height="983" alt="magpie_tts_studio" src="https://github.com/user-attachments/assets/c553af37-64cd-4e16-8925-65cb9d27bc57" />
+Interface Preview (here a example in german language, but the app supports English, German, Spanish, French, Italian, Vietnamese, Chinese, Hindi, Japanese)
 
-  https://github.com/user-attachments/assets/ed5dcb96-3f7a-476e-b8b6-ccc55e748d26
+<img width="1123" height="1023" alt="v2_6_test_german" src="https://github.com/user-attachments/assets/e4fa2090-17f1-4f75-8a9b-cb9e0bb6d04c" />
+
+Preview Output Audio with used postprocessing:
+
+https://github.com/user-attachments/assets/edc8d234-aabe-460a-8cf4-a4f596d2afe0
 
 ## Project structure
 
