@@ -15,6 +15,17 @@ def main() -> int:
         return 0
 
     root = missing.split(".")[0]
+
+    # Windows note:
+    # nemo_text_processing pulls in Pynini/OpenFST. That dependency chain is not a
+    # normal pip-installable Windows runtime dependency and is only required for
+    # NeMo text normalization. Magpie inference can run with apply_TN=False, so the
+    # installer should warn and continue instead of trying `pip install pynini`.
+    optional_windows_tn_modules = {"pynini", "nemo_text_processing"}
+    if root in optional_windows_tn_modules:
+        print("__optional_windows_text_normalization__")
+        return 0
+
     mapping = {
         "nv_one_logger": "nv-one-logger-pytorch-lightning-integration>=2.3.1",
         "wandb": "wandb>=0.17",

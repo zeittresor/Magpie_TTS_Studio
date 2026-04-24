@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 APP_NAME = "Magpie TTS Studio"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.6"
 APP_ORG = "OpenAI"
 APP_DOMAIN = "local.magpie.tts.studio"
 
@@ -18,6 +18,10 @@ MODELS_DIR = APP_DATA_DIR / "models"
 OUTPUT_DIR = APP_DATA_DIR / "outputs"
 LOG_DIR = APP_DATA_DIR / "logs"
 SETTINGS_PATH = APP_DATA_DIR / "settings.json"
+ASSETS_DIR = BASE_DIR / "assets"
+AUDIO_ASSETS_DIR = ASSETS_DIR / "audio"
+PREVIEW_SAMPLE_PATH = AUDIO_ASSETS_DIR / "effect_preview_clean.wav"
+PREVIEW_DIR = APP_DATA_DIR / "preview"
 
 LANGUAGES = {
     "en": "English",
@@ -54,4 +58,26 @@ DEFAULT_SETTINGS = {
     "last_text": "Hello from Magpie TTS Studio.",
     "theme": "dark",
     "filename_template": "magpie_{timestamp}_{language}_{speaker}.wav",
+    "audio_effects_enabled": False,
+    "normalize_audio": True,
+    "normalize_target_db": -1.0,
+    "output_gain_db": 0.0,
+    "chorus_enabled": False,
+    "chorus_mix": 0.35,
+    "chorus_depth_ms": 8.0,
+    "chorus_rate_hz": 0.28,
+    "echo_enabled": False,
+    "echo_delay_ms": 220,
+    "echo_decay": 0.28,
+    "robot_enabled": False,
+    "robot_carrier_hz": 90.0,
+    "robot_mix": 0.65,
+    "tremolo_enabled": False,
+    "tremolo_rate_hz": 5.0,
+    "tremolo_depth": 0.45,
+    "bitcrusher_enabled": False,
+    "bitcrusher_bits": 10,
+    "bitcrusher_hold": 1,
+    "pitch_shift_semitones": 0.0,
+    "speed_factor": 1.0,
 }

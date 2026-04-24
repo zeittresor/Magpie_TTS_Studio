@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import traceback
 from pathlib import Path
-from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -14,6 +13,7 @@ class WorkerSignals(QObject):
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
     status = pyqtSignal(str)
+    progress = pyqtSignal(int, str)
     file_ready = pyqtSignal(str)
 
 
@@ -26,7 +26,9 @@ class DownloadWorker(QObject):
     def run(self) -> None:
         try:
             self.signals.status.emit("download_started")
+            self.signals.progress.emit(0, "download_started")
             model_path = ensure_model_cached(self.cache_dir)
+            self.signals.progress.emit(100, "download_done")
             self.signals.file_ready.emit(str(model_path))
             self.signals.finished.emit(str(model_path))
         except Exception:
@@ -40,10 +42,15 @@ class GenerateWorker(QObject):
         self.request = request
         self.signals = WorkerSignals()
 
+    def _progress(self, percent: int, code: str) -> None:
+        self.signals.progress.emit(percent, code)
+        self.signals.status.emit(code)
+
     def run(self) -> None:
         try:
             self.signals.status.emit("generation_started")
-            output_path: Path = self.backend.generate(self.request)
+            self.signals.progress.emit(0, "generation_started")
+            output_path: Path = self.backend.generate(self.request, progress_callback=self._progress)
             self.signals.file_ready.emit(str(output_path))
             self.signals.finished.emit(str(output_path))
         except Exception:

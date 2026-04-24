@@ -2,6 +2,11 @@
 # Based on official NeMo requirement groups, but intentionally excludes
 # nemo_text_processing / pynini because pip-based Windows installs are not supported there.
 # Text normalization stays optional and is disabled automatically when unavailable.
+# NeMo 2.x declares cuda-bindings as a runtime dependency on non-macOS platforms.
+# Keep this deliberately future-friendly: no upper CUDA major cap is set here,
+# so pip can select CUDA Python 12.x or newer 13.x wheels when they are compatible.
+
+cuda-bindings>=12.8.0
 
 fsspec>=2024.12.0
 huggingface_hub>=0.24

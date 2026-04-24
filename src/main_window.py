@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-import traceback
 from pathlib import Path
+from typing import Any
 
 from PyQt6.QtCore import QThread, QUrl
 from PyQt6.QtGui import QAction
@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QTextEdit,
     QVBoxLayout,
@@ -54,7 +55,7 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
-        self.resize(1100, 760)
+        self.resize(1120, 800)
 
         central = QWidget(self)
         root = QVBoxLayout(central)
@@ -93,6 +94,15 @@ class MainWindow(QMainWindow):
         output_layout = QVBoxLayout(self.output_box)
         self.last_output_label = QLabel()
         self.last_output_label.setWordWrap(True)
+        self.progress_label = QLabel()
+        self.progress_label.setWordWrap(True)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setVisible(False)
+        self.progress_label.setVisible(False)
+
         buttons_1 = QHBoxLayout()
         self.generate_button = QPushButton()
         self.generate_button.clicked.connect(self.generate_audio)
@@ -119,6 +129,8 @@ class MainWindow(QMainWindow):
         buttons_2.addWidget(self.open_cache_button)
 
         output_layout.addWidget(self.last_output_label)
+        output_layout.addWidget(self.progress_label)
+        output_layout.addWidget(self.progress_bar)
         output_layout.addLayout(buttons_1)
         output_layout.addLayout(buttons_2)
 
@@ -180,16 +192,40 @@ class MainWindow(QMainWindow):
         self.action_exit.setText(tr(self.lang, "exit"))
         self.menuBar().actions()[0].setText(tr(self.lang, "file"))
         self.menuBar().actions()[1].setText(tr(self.lang, "help"))
+        self.progress_label.setText(tr(self.lang, "progress_label_idle"))
         self._refresh_voice_summary()
         self._refresh_last_output_label()
         self.statusBar().showMessage(tr(self.lang, "status_ready"))
+
+    def _effects_summary(self) -> str:
+        if not self.settings.get("audio_effects_enabled", False):
+            return tr(self.lang, "effects_off")
+        active: list[str] = []
+        if self.settings.get("normalize_audio", False):
+            active.append("normalize")
+        if self.settings.get("chorus_enabled", False):
+            active.append("chorus")
+        if self.settings.get("echo_enabled", False):
+            active.append("echo")
+        if self.settings.get("robot_enabled", False):
+            active.append("robot/vocoder")
+        if self.settings.get("tremolo_enabled", False):
+            active.append("tremolo")
+        if self.settings.get("bitcrusher_enabled", False):
+            active.append("bitcrusher")
+        if abs(float(self.settings.get("pitch_shift_semitones", 0.0))) >= 0.05:
+            active.append("pitch")
+        if abs(float(self.settings.get("speed_factor", 1.0)) - 1.0) >= 0.01:
+            active.append("speed")
+        return ", ".join(active) if active else tr(self.lang, "effects_on")
 
     def _refresh_voice_summary(self) -> None:
         self.voice_summary.setText(
             f"{tr(self.lang, 'app_language')}: {LANGUAGES.get(self.settings['app_language'], self.settings['app_language'])}\n"
             f"{tr(self.lang, 'tts_language')}: {LANGUAGES.get(self.settings['tts_language'], self.settings['tts_language'])}\n"
             f"{tr(self.lang, 'speaker')}: {self.settings['speaker']}\n"
-            f"{tr(self.lang, 'device')}: {self.settings['device']}"
+            f"{tr(self.lang, 'device')}: {self.settings['device']}\n"
+            f"{tr(self.lang, 'effects_summary')}: {self._effects_summary()}"
         )
 
     def _refresh_last_output_label(self) -> None:
@@ -222,6 +258,16 @@ class MainWindow(QMainWindow):
         self.generate_button.setEnabled(not busy)
         self.download_button.setEnabled(not busy)
         self.voice_button.setEnabled(not busy)
+        self.clear_button.setEnabled(not busy)
+        self.progress_bar.setVisible(busy)
+        self.progress_label.setVisible(busy)
+        if busy:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self.progress_label.setText(tr(self.lang, "progress_label_running"))
+        else:
+            self.progress_bar.setValue(100)
+            self.progress_label.setText(tr(self.lang, "progress_label_idle"))
         if status_text:
             self.statusBar().showMessage(status_text)
 
@@ -234,17 +280,42 @@ class MainWindow(QMainWindow):
         worker.signals.error.connect(self._worker_error)
         worker.signals.file_ready.connect(self._worker_file_ready)
         worker.signals.status.connect(self._worker_status)
+        worker.signals.progress.connect(self._worker_progress)
         worker.signals.finished.connect(self.active_thread.quit)
         worker.signals.error.connect(self.active_thread.quit)
+        self.active_thread.finished.connect(self._thread_finished)
         self.active_thread.finished.connect(self.active_thread.deleteLater)
         self.active_thread.start()
+
+    def _thread_finished(self) -> None:
+        self.active_worker = None
+        self.active_thread = None
 
     def _worker_status(self, code: str) -> None:
         mapping = {
             "download_started": tr(self.lang, "status_downloading"),
             "generation_started": tr(self.lang, "status_generating"),
+            "generation_loading_model": tr(self.lang, "status_loading"),
+            "generation_model_ready": tr(self.lang, "status_model_ready"),
+            "generation_synthesizing": tr(self.lang, "status_generating"),
+            "generation_postprocessing": tr(self.lang, "status_postprocessing"),
+            "generation_saving": tr(self.lang, "status_saving"),
+            "generation_done": tr(self.lang, "status_done"),
         }
         self.statusBar().showMessage(mapping.get(code, tr(self.lang, "status_ready")))
+
+    def _worker_progress(self, percent: int, code: str) -> None:
+        self.progress_bar.setVisible(True)
+        self.progress_label.setVisible(True)
+        if int(percent) < 0:
+            # Unknown duration, for example first-time NeMo/Magpie model load.
+            # This keeps the GUI visibly alive instead of looking stuck at 5%.
+            self.progress_bar.setRange(0, 0)
+        else:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(max(0, min(int(percent), 100)))
+        self._worker_status(code)
+        self.progress_label.setText(self.statusBar().currentMessage() or tr(self.lang, "progress_label_running"))
 
     def _worker_file_ready(self, path_str: str) -> None:
         path = Path(path_str)
@@ -264,7 +335,11 @@ class MainWindow(QMainWindow):
     def _worker_error(self, details: str) -> None:
         self._set_busy(False, tr(self.lang, "status_error"))
         self.append_log(details)
-        QMessageBox.critical(self, tr(self.lang, "error"), details)
+        short_details = details.strip()
+        if len(short_details) > 1800:
+            short_details = short_details[-1800:]
+            short_details = "…\n" + short_details
+        QMessageBox.critical(self, tr(self.lang, "error"), short_details)
 
     def download_model(self) -> None:
         self.settings["last_text"] = self.text_edit.toPlainText()
@@ -272,6 +347,33 @@ class MainWindow(QMainWindow):
         self._set_busy(True, tr(self.lang, "status_downloading"))
         worker = DownloadWorker(self.settings["cache_dir"])
         self._start_worker(worker)
+
+    def _collect_audio_effect_settings(self) -> dict[str, Any]:
+        keys = [
+            "audio_effects_enabled",
+            "normalize_audio",
+            "normalize_target_db",
+            "output_gain_db",
+            "chorus_enabled",
+            "chorus_mix",
+            "chorus_depth_ms",
+            "chorus_rate_hz",
+            "echo_enabled",
+            "echo_delay_ms",
+            "echo_decay",
+            "robot_enabled",
+            "robot_carrier_hz",
+            "robot_mix",
+            "tremolo_enabled",
+            "tremolo_rate_hz",
+            "tremolo_depth",
+            "bitcrusher_enabled",
+            "bitcrusher_bits",
+            "bitcrusher_hold",
+            "pitch_shift_semitones",
+            "speed_factor",
+        ]
+        return {key: self.settings.get(key) for key in keys}
 
     def generate_audio(self) -> None:
         text = self.text_edit.toPlainText().strip()
@@ -290,6 +392,7 @@ class MainWindow(QMainWindow):
             cache_dir=self.settings["cache_dir"],
             filename_template=self.settings["filename_template"],
             save_output_copy=bool(self.settings.get("save_output_copy", True)),
+            audio_effects=self._collect_audio_effect_settings(),
         )
         self._set_busy(True, tr(self.lang, "status_generating"))
         worker = GenerateWorker(self.backend, request)
