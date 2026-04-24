@@ -72,6 +72,8 @@ python app.py
 - The app stores settings in `app_data/settings.json`.
 - Audio effects are applied after Magpie has generated the WAV data. This keeps the core model inference path stable and allows fast reconfiguration of output coloration.
 - In Settings → Audio effects, use `Preview original` and `Preview current effects` to compare the bundled clean WAV with the currently selected effect chain without generating new speech.
+- The complete installation including all requirements takes ~7.5GB disc space at all.
+- The first audio might take a while because the engine have to load the model into memory first, its much faster for the next runs.
 
 ## Supported model languages
 
