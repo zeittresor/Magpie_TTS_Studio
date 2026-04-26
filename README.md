@@ -74,6 +74,7 @@ python app.py
 - In Settings → Audio effects, use `Preview original` and `Preview current effects` to compare the bundled clean WAV with the currently selected effect chain without generating new speech.
 - The complete installation including all requirements takes ~7.5GB disc space at all.
 - The first audio might take a while because the engine have to load the model into memory first, its much faster for the next runs.
+- The project is just a GUI and Windows-Installer "FOR" the NVIDIA `nvidia/magpie_tts_multilingual_357m` Model, the GUI its not created "BY" NVIDIA. Please respect the Licence of the model by NVIDIA if you use this GUI for it.
 
 ## Supported model languages
 
