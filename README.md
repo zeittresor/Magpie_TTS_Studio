@@ -1,6 +1,6 @@
 # Magpie TTS Studio
 
-A modern PyQt6 desktop GUI for the Hugging Face model `nvidia/magpie_tts_multilingual_357m` by NVIDIA.
+A modern PyQt6 desktop GUI for the Hugging Face model `nvidia/magpie_tts_multilingual_357m`.
 
 ## Features
 
