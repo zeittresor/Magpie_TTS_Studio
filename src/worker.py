@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from .downloader import ensure_model_cached
+from .downloader import ensure_all_model_files_cached
 from .tts_backend import GenerationRequest, MagpieBackend
 
 
@@ -18,16 +18,17 @@ class WorkerSignals(QObject):
 
 
 class DownloadWorker(QObject):
-    def __init__(self, cache_dir: str) -> None:
+    def __init__(self, cache_dir: str, offline_mode: bool = False) -> None:
         super().__init__()
         self.cache_dir = cache_dir
+        self.offline_mode = offline_mode
         self.signals = WorkerSignals()
 
     def run(self) -> None:
         try:
             self.signals.status.emit("download_started")
             self.signals.progress.emit(0, "download_started")
-            model_path = ensure_model_cached(self.cache_dir)
+            model_path = ensure_all_model_files_cached(self.cache_dir, offline_mode=self.offline_mode)
             self.signals.progress.emit(100, "download_done")
             self.signals.file_ready.emit(str(model_path))
             self.signals.finished.emit(str(model_path))

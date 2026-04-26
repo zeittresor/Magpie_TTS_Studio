@@ -15,6 +15,7 @@ from .audio_effects import apply_audio_effects
 from .constants import DEFAULT_SAMPLE_RATE, MODEL_REPO_ID, SPEAKERS
 from .downloader import ensure_model_cached, model_file_from_cache
 from .file_utils import ensure_dir
+from .runtime_env import configure_runtime_environment
 
 LOGGER = logging.getLogger(__name__)
 ProgressCallback = Callable[[int, str], None]
@@ -32,6 +33,7 @@ class GenerationRequest:
     filename_template: str
     save_output_copy: bool
     audio_effects: dict[str, Any] | None = None
+    offline_mode: bool = False
 
 
 class MagpieBackend:
@@ -51,13 +53,9 @@ class MagpieBackend:
             return torch.device("cpu")
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def _configure_cache_environment(self, cache_dir: str | Path) -> None:
+    def _configure_cache_environment(self, cache_dir: str | Path, offline_mode: bool = False) -> None:
         """Keep Magpie, Transformers and HF downloads inside the project cache when possible."""
-        cache_path = str(ensure_dir(cache_dir))
-        os.environ["HF_HOME"] = cache_path
-        os.environ["HUGGINGFACE_HUB_CACHE"] = cache_path
-        os.environ["TRANSFORMERS_CACHE"] = cache_path
-        os.environ["NEMO_CACHE_DIR"] = cache_path
+        configure_runtime_environment(cache_dir, offline_mode=offline_mode)
 
     def _load_model_class(self):
         from nemo.collections.tts import models as nemo_tts_models
@@ -194,7 +192,7 @@ class MagpieBackend:
         with self._temporary_embedding_compat_patch():
             return model_cls.from_pretrained(MODEL_REPO_ID)
 
-    def ensure_loaded(self, cache_dir: str, device_choice: str) -> None:
+    def ensure_loaded(self, cache_dir: str, device_choice: str, offline_mode: bool = False) -> None:
         requested_device = self._resolve_device(device_choice)
         if self.model is not None and self.device == requested_device:
             return
@@ -208,7 +206,7 @@ class MagpieBackend:
             self._loaded_device_choice = device_choice
             return
 
-        self._configure_cache_environment(cache_dir)
+        self._configure_cache_environment(cache_dir, offline_mode=offline_mode)
 
         # Helpful speed defaults on RTX/Ampere+ GPUs. Safe no-op on older hardware/CPU.
         if requested_device.type == "cuda":
@@ -219,7 +217,7 @@ class MagpieBackend:
             except Exception:
                 LOGGER.debug("Could not enable CUDA TF32 fast path.", exc_info=True)
 
-        self.model_path = ensure_model_cached(cache_dir)
+        self.model_path = ensure_model_cached(cache_dir, offline_mode=offline_mode)
         model_cls = self._load_model_class()
         self.device = requested_device
 
@@ -227,6 +225,12 @@ class MagpieBackend:
             self.model = self._restore_from_local_nemo(model_cls, requested_device)
         except Exception as local_error:
             LOGGER.warning("Local .nemo loading failed: %s", local_error)
+            if offline_mode:
+                raise RuntimeError(
+                    "Offline mode is enabled and the local Magpie .nemo checkpoint could not be restored. "
+                    "Disable offline mode once to refresh the cache, or inspect the local model file. "
+                    f"Original error: {local_error}"
+                ) from local_error
             self.model = self._restore_from_hf_repo(model_cls)
 
         if hasattr(self.model, "to"):
@@ -261,7 +265,7 @@ class MagpieBackend:
             raise ValueError("Text is empty.")
 
         self._emit_progress(progress_callback, -1, "generation_loading_model")
-        self.ensure_loaded(request.cache_dir, request.device)
+        self.ensure_loaded(request.cache_dir, request.device, offline_mode=bool(request.offline_mode))
         self._emit_progress(progress_callback, 20, "generation_model_ready")
 
         speaker_index = SPEAKERS[request.speaker]

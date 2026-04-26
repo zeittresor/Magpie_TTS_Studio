@@ -3,12 +3,17 @@ from __future__ import annotations
 from pathlib import Path
 
 APP_NAME = "Magpie TTS Studio"
-APP_VERSION = "0.2.6"
+APP_VERSION = "0.2.8"
 APP_ORG = "OpenAI"
 APP_DOMAIN = "local.magpie.tts.studio"
 
 MODEL_REPO_ID = "nvidia/magpie_tts_multilingual_357m"
 MODEL_FILENAME = "magpie_tts_multilingual_357m.nemo"
+AUXILIARY_MODEL_REPO_IDS = (
+    "microsoft/wavlm-base-plus",
+    "google/byt5-small",
+    "nvidia/nemo-nano-codec-22khz-1.89kbps-21.5fps",
+)
 DEFAULT_SAMPLE_RATE = 22000
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -51,6 +56,9 @@ DEFAULT_SETTINGS = {
     "speaker": "Sofia",
     "device": "auto",
     "apply_text_normalization": False,
+    "offline_mode": False,
+    "auto_download_on_first_start": True,
+    "first_start_model_check_done": False,
     "autoplay": True,
     "save_output_copy": True,
     "output_dir": str(OUTPUT_DIR),

@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from PyQt6.QtCore import QThread, QUrl
+from PyQt6.QtCore import QThread, QTimer, QUrl
 from PyQt6.QtGui import QAction
 from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PyQt6.QtWidgets import (
@@ -26,6 +26,8 @@ from .constants import APP_NAME, APP_VERSION, LANGUAGES
 from .file_utils import ensure_dir, open_in_file_manager
 from .options_dialog import OptionsDialog
 from .settings_manager import SettingsManager
+from .network_utils import has_normal_network_address
+from .runtime_env import configure_runtime_environment
 from .style import build_stylesheet
 from .translations import tr
 from .tts_backend import GenerationRequest, MagpieBackend
@@ -44,6 +46,7 @@ class MainWindow(QMainWindow):
         self.last_output_path: Path | None = None
         self.active_thread: QThread | None = None
         self.active_worker = None
+        self.active_job: str | None = None
 
         self.player = QMediaPlayer(self)
         self.audio_output = QAudioOutput(self)
@@ -52,6 +55,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self.apply_settings_to_ui()
         self.retranslate_ui()
+        QTimer.singleShot(1300, self._maybe_auto_download_on_first_start)
 
     def _build_ui(self) -> None:
         self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
@@ -109,7 +113,7 @@ class MainWindow(QMainWindow):
         self.clear_button = QPushButton()
         self.clear_button.clicked.connect(self.text_edit.clear)
         self.download_button = QPushButton()
-        self.download_button.clicked.connect(self.download_model)
+        self.download_button.clicked.connect(lambda: self.download_model())
         buttons_1.addWidget(self.generate_button)
         buttons_1.addWidget(self.clear_button)
         buttons_1.addWidget(self.download_button)
@@ -225,6 +229,8 @@ class MainWindow(QMainWindow):
             f"{tr(self.lang, 'tts_language')}: {LANGUAGES.get(self.settings['tts_language'], self.settings['tts_language'])}\n"
             f"{tr(self.lang, 'speaker')}: {self.settings['speaker']}\n"
             f"{tr(self.lang, 'device')}: {self.settings['device']}\n"
+            f"{tr(self.lang, 'offline_mode_summary')}: {tr(self.lang, 'yes') if self.settings.get('offline_mode', False) else tr(self.lang, 'no')}\n"
+            f"{tr(self.lang, 'auto_download_summary')}: {tr(self.lang, 'yes') if self.settings.get('auto_download_on_first_start', True) else tr(self.lang, 'no')}\n"
             f"{tr(self.lang, 'effects_summary')}: {self._effects_summary()}"
         )
 
@@ -238,6 +244,7 @@ class MainWindow(QMainWindow):
         self.lang = self.settings.get("app_language", "en")
         ensure_dir(self.settings["output_dir"])
         ensure_dir(self.settings["cache_dir"])
+        configure_runtime_environment(self.settings["cache_dir"], offline_mode=bool(self.settings.get("offline_mode", False)))
         self.text_edit.setPlainText(self.settings.get("last_text", ""))
         self.setStyleSheet(build_stylesheet(self.settings.get("theme", "dark")))
         self.retranslate_ui()
@@ -271,9 +278,10 @@ class MainWindow(QMainWindow):
         if status_text:
             self.statusBar().showMessage(status_text)
 
-    def _start_worker(self, worker) -> None:
+    def _start_worker(self, worker, job_kind: str = "generic") -> None:
         self.active_thread = QThread(self)
         self.active_worker = worker
+        self.active_job = job_kind
         worker.moveToThread(self.active_thread)
         self.active_thread.started.connect(worker.run)
         worker.signals.finished.connect(self._worker_finished)
@@ -290,6 +298,7 @@ class MainWindow(QMainWindow):
     def _thread_finished(self) -> None:
         self.active_worker = None
         self.active_thread = None
+        self.active_job = None
 
     def _worker_status(self, code: str) -> None:
         mapping = {
@@ -331,6 +340,9 @@ class MainWindow(QMainWindow):
                 self.play_last_output()
         else:
             self.append_log(f"{tr(self.lang, 'download_complete')} {result}")
+            if not self.settings.get("first_start_model_check_done", False):
+                self.settings["first_start_model_check_done"] = True
+                self.settings_manager.save(self.settings)
 
     def _worker_error(self, details: str) -> None:
         self._set_busy(False, tr(self.lang, "status_error"))
@@ -341,12 +353,29 @@ class MainWindow(QMainWindow):
             short_details = "…\n" + short_details
         QMessageBox.critical(self, tr(self.lang, "error"), short_details)
 
-    def download_model(self) -> None:
+    def download_model(self, *, auto_started: bool = False) -> None:
         self.settings["last_text"] = self.text_edit.toPlainText()
         self.settings_manager.save(self.settings)
         self._set_busy(True, tr(self.lang, "status_downloading"))
-        worker = DownloadWorker(self.settings["cache_dir"])
-        self._start_worker(worker)
+        worker = DownloadWorker(self.settings["cache_dir"], offline_mode=bool(self.settings.get("offline_mode", False)))
+        self._start_worker(worker, job_kind="auto_download" if auto_started else "download")
+
+    def _maybe_auto_download_on_first_start(self) -> None:
+        if self.active_thread is not None:
+            return
+        if not self.settings.get("auto_download_on_first_start", True):
+            return
+        if self.settings.get("first_start_model_check_done", False):
+            return
+        if self.settings.get("offline_mode", False):
+            self.append_log(tr(self.lang, "auto_download_skip_offline"))
+            return
+        ok, addresses = has_normal_network_address()
+        if not ok:
+            self.append_log(tr(self.lang, "auto_download_skip_no_network"))
+            return
+        self.append_log(f"{tr(self.lang, 'auto_download_first_start')} IP: {', '.join(addresses[:3])}")
+        self.download_model(auto_started=True)
 
     def _collect_audio_effect_settings(self) -> dict[str, Any]:
         keys = [
@@ -393,10 +422,11 @@ class MainWindow(QMainWindow):
             filename_template=self.settings["filename_template"],
             save_output_copy=bool(self.settings.get("save_output_copy", True)),
             audio_effects=self._collect_audio_effect_settings(),
+            offline_mode=bool(self.settings.get("offline_mode", False)),
         )
         self._set_busy(True, tr(self.lang, "status_generating"))
         worker = GenerateWorker(self.backend, request)
-        self._start_worker(worker)
+        self._start_worker(worker, job_kind="generate")
 
     def play_last_output(self) -> None:
         if not self.last_output_path or not self.last_output_path.exists():

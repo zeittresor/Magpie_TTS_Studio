@@ -89,6 +89,8 @@ class OptionsDialog(QDialog):
         self.cache_dir_edit = QLineEdit()
         self.filename_template_edit = QLineEdit()
         self.apply_tn_check = QCheckBox()
+        self.offline_mode_check = QCheckBox()
+        self.auto_download_check = QCheckBox()
         self.autoplay_check = QCheckBox()
         self.save_copy_check = QCheckBox()
 
@@ -139,6 +141,8 @@ class OptionsDialog(QDialog):
         self.form.addRow(self.label_device, self.device_combo)
         self.form.addRow(self.label_theme, self.theme_combo)
         self.form.addRow(QLabel(""), self.apply_tn_check)
+        self.form.addRow(QLabel(""), self.offline_mode_check)
+        self.form.addRow(QLabel(""), self.auto_download_check)
         self.form.addRow(QLabel(""), self.autoplay_check)
         self.form.addRow(QLabel(""), self.save_copy_check)
         self.form.addRow(self.label_filename_template, self.filename_template_edit)
@@ -284,6 +288,8 @@ class OptionsDialog(QDialog):
         self.cache_dir_edit.setText(self.settings.get("cache_dir", ""))
         self.filename_template_edit.setText(self.settings.get("filename_template", DEFAULT_SETTINGS["filename_template"]))
         self.apply_tn_check.setChecked(bool(self.settings.get("apply_text_normalization", False)))
+        self.offline_mode_check.setChecked(bool(self.settings.get("offline_mode", False)))
+        self.auto_download_check.setChecked(bool(self.settings.get("auto_download_on_first_start", True)))
         self.autoplay_check.setChecked(bool(self.settings.get("autoplay", True)))
         self.save_copy_check.setChecked(bool(self.settings.get("save_output_copy", True)))
 
@@ -320,6 +326,8 @@ class OptionsDialog(QDialog):
         self.cache_browse.setText(tr(self.lang, "browse"))
         self.reset_button.setText(tr(self.lang, "reset_defaults"))
         self.apply_tn_check.setText(tr(self.lang, "text_normalization"))
+        self.offline_mode_check.setText(tr(self.lang, "offline_mode"))
+        self.auto_download_check.setText(tr(self.lang, "auto_download_on_first_start"))
         self.autoplay_check.setText(tr(self.lang, "autoplay"))
         self.save_copy_check.setText(tr(self.lang, "save_output_copy"))
         self.label_app_language.setText(tr(self.lang, "app_language"))
@@ -360,6 +368,8 @@ class OptionsDialog(QDialog):
         self.label_speed_factor.setText(tr(self.lang, "speed_factor"))
         self.hint_label.setText(
             f"• {tr(self.lang, 'offline_hint')}\n"
+            f"• {tr(self.lang, 'offline_mode_hint')}\n"
+            f"• {tr(self.lang, 'auto_download_hint')}\n"
             f"• {tr(self.lang, 'device_auto_hint')}\n"
             f"• {tr(self.lang, 'audio_effects_hint')}\n"
             f"• {tr(self.lang, 'effect_preview_hint')}\n"
@@ -425,6 +435,8 @@ class OptionsDialog(QDialog):
             "cache_dir": self.cache_dir_edit.text().strip(),
             "filename_template": self.filename_template_edit.text().strip() or DEFAULT_SETTINGS["filename_template"],
             "apply_text_normalization": self.apply_tn_check.isChecked(),
+            "offline_mode": self.offline_mode_check.isChecked(),
+            "auto_download_on_first_start": self.auto_download_check.isChecked(),
             "autoplay": self.autoplay_check.isChecked(),
             "save_output_copy": self.save_copy_check.isChecked(),
             **self._collect_audio_effect_settings(force_enabled=False),

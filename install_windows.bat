@@ -19,6 +19,7 @@ echo   2. install GUI dependencies
 echo   3. install NVIDIA NeMo and curated Windows runtime dependencies
 echo   4. optionally pre-download the Magpie model
 echo   5. optionally start the GUI after setup
+echo   6. let the GUI run a one-time first-start cache check when online
 echo.
 call :warn "Text normalization via nemo_text_processing / Pynini is not installed by default on Windows."
 call :info "The app can still synthesize speech. TN remains optional and may auto-disable."
@@ -203,10 +204,10 @@ call :warn "Please keep this console output and send it back for another patch r
 goto :error
 
 :ask_prefetch
-choice /C YN /N /T 10 /D Y /M "Pre-download the Magpie model now? [Y/N] default Y in 10s: "
+choice /C YN /N /T 10 /D Y /M "Pre-download the Magpie model and auxiliary runtime files now? [Y/N] default Y in 10s: "
 if errorlevel 2 goto :done
 if errorlevel 1 (
-    call :step "Downloading model into local cache..."
+    call :step "Downloading model and auxiliary runtime files into local cache..."
     python tools\preload_models.py
     if errorlevel 1 goto :error
 )
@@ -228,6 +229,7 @@ exit /b 0
 :start_gui
 echo.
 call :step "Starting GUI now. The console window will be minimized where Windows allows it."
+call :info "On first GUI start, Download/check model may run once automatically if a normal network IP is available."
 call :minimize_console
 python app.py
 echo.
